@@ -232,14 +232,21 @@ See `设计说明.md` for details.
 
 ## Compatibility
 
-- Tested on DSH `0.1.2-rc.1` (since 0.6.5 the choice-card entry is adapted to that
-  version's new protocol: the `conversation.composer` chain selector receives a single
-  `pendingInteraction` (the native `PendingQuestion`), and answers go through
-  `.answer({answers})` / `.cancel()`); since 0.6.6 the tests bundle their own
+- Tested on DSH `0.2.0-rc.2` (PendingQuestion cancel→dismiss adaptation): since 0.6.5 the
+  choice-card entry is adapted to the 0.1.2-rc.1 protocol (the `conversation.composer` chain
+  selector receives a single `pendingInteraction` (the native `PendingQuestion`), and answers
+  go through `.answer({answers})` / `.cancel()`); **since 0.7.0, DSH 0.2.0 removed
+  `PendingQuestion.cancel()` (replaced by `dismiss()` + `dismissal: 'hide'|'cancel'`), and this
+  plugin adapts accordingly: the claim guard no longer requires `cancel` (compatible with both
+  versions); dismissing the whole question batch prefers `cancel` and falls back to `dismiss`
+  when missing; when `dismissal === 'hide'` (callId present — dismiss only hides the panel and
+  does not end the request) the card shows an in-place hint asking the model to ask again
+  instead of throwing or auto-resending**; since 0.6.6 the tests bundle their own
   react/react-dom and no longer depend on the host installation layout.
 - The `data-chat-flow` container, the `dshimg:` placeholder protocol, and the lightbox —
   all anchors the chat image zoom relies on — were verified one by one against
-  `dsh-client-ui-chat` in 0.1.2-rc.1.
+  `dsh-client-ui-chat` in 0.1.2-rc.1; since 0.7.0 the generic chat image zoom is handed back
+  to the native lightbox (provided natively by DSH 0.2.0's `dsh-client-ui-attachment`).
 - Plain-text questions are unaffected (handed to the native UI or
   `dsh-plugin-choice-refresh`).
 - Depends on the client services `slots` / `locale`.

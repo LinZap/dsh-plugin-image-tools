@@ -62,7 +62,7 @@ assert.ok(!mod.isShowImageSrc('https://example.com/a.png'), '外部图片不应�
 assert.equal(mod.startInlineEnhancer(), null, '无 DOM 环境下不应启动观察器')
 assert.equal(mod.startClickDelegation(), null, '无 DOM 环境下不应挂点击委托')
 
-// 5a) 聊天栏图片放大判定（纯逻辑，fake DOM 对象）
+// 5a) 插件图片放大判定（纯逻辑，fake DOM 对象）——原生 lightbox 接管非插件图片
 const fakeClosest = (insideFlow, inButton, inPick) => (sel) => {
   if (sel === '[data-chat-flow]') return insideFlow ? {} : null
   if (sel === 'button, a, [role="button"], [role="link"], [role="menuitem"]') return inButton ? {} : null
@@ -80,12 +80,10 @@ const fakeImg = (opts) => ({
 assert.equal(mod.isPluginImageSrc('/dsh-plugin-image-tools/show/a/0'), true, 'show 路由应判定为插件图')
 assert.equal(mod.isPluginImageSrc('http://127.0.0.1:3080/dsh-plugin-image-tools/attachment/att-123'), true, 'attachment 绝对 URL 应判定为插件图')
 assert.equal(mod.isPluginImageSrc('/dsh-plugin-image-tools/pick-1/0'), false, '选择卡路由不是内嵌插件图')
-assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: true })), true, '聊天栏内内容图应可放大')
-assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: true, w: 16, h: 16, nw: 16 })), false, '聊天栏内小图标不应放大')
-assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: true, inButton: true })), false, '按钮内图片应放行给原生语义')
-assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: true, inPick: true })), false, '选择卡内图片应由卡片自己的放大处理')
-assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: false, src: 'https://example.com/a.png' })), false, '聊天栏外的图片不放大')
-assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: true, src: '/dsh-plugin-image-tools/show/x/0' })), true, '插件图无条件放大')
+assert.equal(mod.isZoomableChatImage(fakeImg({ src: '/dsh-plugin-image-tools/show/x/0' })), true, '插件图可放大')
+assert.equal(mod.isZoomableChatImage(fakeImg({ src: 'http://127.0.0.1:3080/dsh-plugin-image-tools/attachment/x' })), true, 'attachment 图可放大')
+assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: true, inPick: true, src: '/dsh-plugin-image-tools/show/x/0' })), false, '选择卡内图片由卡片自己的放大处理')
+assert.equal(mod.isZoomableChatImage(fakeImg({ insideFlow: true, src: 'https://example.com/a.png' })), false, '非插件图片交给原生 lightbox，不放大')
 assert.equal(mod.isZoomableChatImage(null), false, 'null 不应放大')
 
 // 5c) 放大层缩放纯函数
@@ -144,6 +142,48 @@ assert.equal(mod.selectPickChoice({ pendingInteraction: plain }), null, '纯文�
 assert.equal(mod.selectPickChoice({ pendingInteraction: planReview }), null, 'plan-review 应放行')
 assert.equal(mod.selectPickChoice({ pendingInteraction: null }), null, '无 pendingInteraction 应放行')
 assert.equal(mod.selectPickChoice({ pendingInteraction: withImage }), withImage, '带图问题应认领')
+
+// 2a) dsh 0.2.0 适配：只有 dismiss 没有 cancel 的 pending 也能被 isPendingQuestion 认领
+const dismissOnly = {
+  kind: 'question',
+  key: 'q:4',
+  sessionId: 's1',
+  questions: [{ id: 'd', question: '选图', detail: markerDetail, options: [{ label: 'A' }] }],
+  answer: async () => {},
+  dismiss: async () => {},
+  dismissal: 'hide',
+  callId: 'call-1',
+}
+assert.equal(typeof dismissOnly.cancel, 'undefined', '0.2.0 pending 无 cancel')
+assert.equal(mod.selectPickChoice({ pendingInteraction: dismissOnly }), dismissOnly, 'dismiss-only pending 应被认领')
+assert.equal(mod.selectPickChoice({ pendingInteraction: { questions: [], answer: 'no' } }), null, 'answer 非函数应放行')
+
+// 2b) 放弃整组问题：有 cancel 优先 cancel；无 cancel 回退 dismiss；
+//     dismissal === 'hide'（有 callId）不调用 dismiss、不抛错，交给 UI 就地提示
+const calls = []
+const cancelable = new mod.PendingChoice(fakePending([{ id: 'x', question: 'q', options: [] }], { cancel: async () => { calls.push('cancel') } }))
+assert.equal(cancelable.cancelSupported, true)
+await cancelable.cancel()
+const dismissable = new mod.PendingChoice({
+  kind: 'question', key: 'q:6', sessionId: 's1',
+  questions: [{ id: 'x', question: 'q', options: [] }],
+  answer: async () => {},
+  dismiss: async () => { calls.push('dismiss') },
+  dismissal: 'cancel',
+})
+assert.equal(dismissable.cancelSupported, true)
+await dismissable.cancel()
+const hideCard = new mod.PendingChoice({
+  kind: 'question', key: 'q:5', sessionId: 's1',
+  questions: [{ id: 'x', question: 'q', options: [] }],
+  answer: async () => {},
+  dismiss: async () => { calls.push('hide') },
+  dismissal: 'hide',
+  callId: 'call-1',
+})
+assert.equal(hideCard.cancelSupported, false, 'dismissal=hide 时不能真正取消')
+await assert.rejects(hideCard.cancel(), /cancel-unavailable/, 'hide 卡 cancel 应抛哨兵错误而非 TypeError')
+assert.deepEqual(calls, ['cancel', 'dismiss'], '应 cancel 优先、dismiss 回退，hide 卡不得调 dismiss')
 
 // 3) parseMarker 与服务端互通
 const parsed = mod.parseMarker(markerDetail)

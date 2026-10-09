@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0] - 2026-09-30
+
+- **移除与原生重复的功能**：聊天栏任意图片点击放大（含滚轮缩放/拖拽平移）自 DSH 0.2.0 起由原生
+  `dsh-client-ui-attachment` 的 lightbox 提供，本插件整体移除该增强——非插件来源的图片不再被
+  扫描/加光标/拦截点击，全部交还原生；插件自己图片路由（show/attachment）的放大与
+  `dshimg:` 占位符回显保留。清理 `isInteractiveContext` / `isContentSized` / `CHAT_FLOW_SELECTOR` 等死代码。
+- 适配 dsh 0.2.0 PendingQuestion dismiss 变更：0.2.0 移除 `PendingQuestion.cancel()`（改为
+  `dismiss()` + `dismissal: 'hide'|'cancel'`），原鸭子检查 `typeof value.cancel === 'function'`
+  恒 false 导致图片选择卡在 0.2.0 下完全不认领、认领后放弃整组问题会 TypeError；现认领守卫只要求
+  `answer` + `questions`（兼容两个版本），放弃时优先 `cancel`、缺失回退 `dismiss`，`dismissal === 'hide'`
+  （有 callId，dismiss 只收起面板不结束请求）时改为就地提示「让模型重新提问」，不抛错不自动重发。
+
 ## [0.6.8] - 2026-09-12
 
 - 加固：`show_images` 工具防漏贴增强。实测部分模型（如 glm 系）调用成功后会把片段忘在工具结果里，

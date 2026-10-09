@@ -208,11 +208,16 @@ npm install
 
 ## 兼容性
 
-- 实测于 DSH `0.1.2-rc.1`（0.6.5 起适配该版选择卡新协议：`conversation.composer` 链的
-  select 入参改为单对象 `pendingInteraction`（原生 `PendingQuestion`），应答走
-  `.answer({answers})` / `.cancel()`）；0.6.6 起测试自带 react/react-dom，不再依赖宿主安装布局。
+- 实测于 DSH `0.2.0-rc.2`（PendingQuestion cancel→dismiss 适配）：0.6.5 起适配 0.1.2-rc.1
+  选择卡新协议（`conversation.composer` 链 select 入参为单对象 `pendingInteraction`（原生
+  `PendingQuestion`），应答走 `.answer({answers})` / `.cancel()`）；**0.7.0 起 DSH 0.2.0 移除了
+  `PendingQuestion.cancel()`（改为 `dismiss()` + `dismissal: 'hide'|'cancel'`），本插件已适配：
+  认领守卫不再要求 `cancel`（兼容两个版本），放弃整组问题时优先 `cancel`、缺失回退 `dismiss`；
+  `dismissal === 'hide'`（有 callId，dismiss 只收起面板不结束请求）时改为就地提示「让模型重新提问」，
+  不抛错不自动重发**；0.6.6 起测试自带 react/react-dom，不再依赖宿主安装布局。
 - 聊天图片放大所依赖的 `data-chat-flow` 容器、`dshimg:` 占位符协议、lightbox 已在
-  0.1.2-rc.1 的 `dsh-client-ui-chat` 中逐一核验保留。
+  0.1.2-rc.1 的 `dsh-client-ui-chat` 中逐一核验保留；0.7.0 起聊天栏通用图片放大交还原生
+  lightbox（DSH 0.2.0 原生 `dsh-client-ui-attachment` 已提供）。
 - 纯文字问题不受本插件影响（放行给原生 UI 或 `dsh-plugin-choice-refresh`）。
 - 依赖客户端服务：`slots` / `locale`。
 
